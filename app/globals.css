@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold-50: #fbf5e7;
+  --color-gold-100: #f5e6c2;
+  --color-gold-200: #ecd08a;
+  --color-gold-300: #e2bc5e;
+  --color-gold-400: #d9af49;
+  --color-gold-500: #c89a2e;
+  --color-gold-600: #a67f22;
+  --color-gold-700: #7d5f1a;
+  --color-gold-800: #5c4514;
+  --color-gold-900: #4a3710;
+
+  --color-navy-50: #eef2f7;
+  --color-navy-100: #d7e0eb;
+  --color-navy-200: #a9bcd4;
+  --color-navy-300: #7192b3;
+  --color-navy-400: #3f6690;
+  --color-navy-500: #234870;
+  --color-navy-600: #163457;
+  --color-navy-700: #102843;
+  --color-navy-800: #0b1e33;
+  --color-navy-900: #071527;
+}
+
+:root {
+  --unesa-gold: #d9af49;
+  --unesa-gold-dark: #a67f22;
+  --unesa-navy: #0b1e33;
+  --unesa-navy-light: #163457;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body), 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #14243a;
+  background-image:
+    linear-gradient(rgba(247,244,234,0.8), rgba(247,244,234,0.8)),
+    radial-gradient(circle at 14% 18%, rgba(217, 175, 73, 0.10), transparent 36%),
+    radial-gradient(circle at 82% 10%, rgba(11, 30, 51, 0.06), transparent 32%),
+    radial-gradient(circle at 70% 90%, rgba(217, 175, 73, 0.06), transparent 30%),
+    url('/bg_image.png');
+  background-color: #f8f5ec;
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-body), 'Plus Jakarta Sans', system-ui, sans-serif;
+}
