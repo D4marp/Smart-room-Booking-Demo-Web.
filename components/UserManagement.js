@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Search, UserPlus } from 'lucide-react';
 
-const ROLE_OPTIONS = ['user', 'booking', 'admin'];
+const ROLE_OPTIONS = ['user', 'booking', 'dosen', 'admin'];
 
 const inputClass =
   'h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-gold-400';
@@ -80,6 +80,7 @@ export default function UserManagement({
           <option value="">Semua Role</option>
           <option value="user">User</option>
           <option value="booking">Booking</option>
+          <option value="dosen">Dosen</option>
           <option value="admin">Admin</option>
           <option value="superadmin">Superadmin</option>
         </select>
@@ -172,6 +173,7 @@ export default function UserManagement({
                     >
                       <option value="user">user</option>
                       <option value="booking">booking</option>
+                      <option value="dosen">dosen</option>
                       <option value="admin">admin</option>
                       <option value="superadmin">superadmin</option>
                     </select>
