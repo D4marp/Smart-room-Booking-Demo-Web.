@@ -112,8 +112,8 @@ function formatPihakLine(booking) {
 
   if (!pihak1 && !pihak2) return null;
   if (!pihak1) return `Pihak 2: ${pihak2}`;
-  if (!pihak2) return `Pihak 1: ${pihak1}`;
-  return `${pihak1}: ${pihak2}`;
+  if (!pihak2) return `Dosen Pengajar: ${pihak1}`;
+  return `Dosen Pengajar: ${pihak1} · Pihak 2: ${pihak2}`;
 }
 
 function getBookingDateTime(booking, timeValue) {
@@ -171,18 +171,22 @@ function FieldLabel({ htmlFor, required, children }) {
   );
 }
 
+const timeFieldClass =
+  'h-14 w-full rounded-xl border border-slate-200 bg-white px-3 text-2xl font-bold text-slate-900 outline-none transition focus:border-gold-400';
+
 function TimeSelect24({ id, label, required, value, onChange }) {
   const { hour, minute } = splitTimeValue(value);
 
   return (
     <div>
-      <FieldLabel htmlFor={`${id}-hour`} required={required}>
+      <label htmlFor={`${id}-hour`} className="mb-1 block text-sm font-semibold text-slate-800">
         {label}
-      </FieldLabel>
+        {required ? <span className="text-red-600"> *</span> : null}
+      </label>
       <div className="grid grid-cols-2 gap-2">
         <select
           id={`${id}-hour`}
-          className={fieldClass}
+          className={timeFieldClass}
           value={hour}
           onChange={(event) => onChange(joinTimeValue(event.target.value, minute))}
           required={required}
@@ -195,7 +199,7 @@ function TimeSelect24({ id, label, required, value, onChange }) {
         </select>
         <select
           id={`${id}-minute`}
-          className={fieldClass}
+          className={timeFieldClass}
           value={minute}
           onChange={(event) => onChange(joinTimeValue(hour, event.target.value))}
           required={required}
@@ -626,7 +630,7 @@ export default function BookingCalendar({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <FieldLabel htmlFor="pihak-1">Pihak 1</FieldLabel>
+                    <FieldLabel htmlFor="pihak-1">Dosen Pengajar</FieldLabel>
                     <input
                       id="pihak-1"
                       className={fieldClass}
@@ -635,7 +639,7 @@ export default function BookingCalendar({
                       onChange={(event) =>
                         setFormState((prev) => ({ ...prev, pihak1: event.target.value }))
                       }
-                      placeholder="Pihak 1 (opsional)"
+                      placeholder="Nama dosen pengajar (opsional)"
                     />
                   </div>
                   <div>
@@ -693,14 +697,14 @@ export default function BookingCalendar({
                 </div>
 
                 <div>
-                  <FieldLabel htmlFor="purpose">Tujuan / Judul Rapat</FieldLabel>
+                  <FieldLabel htmlFor="purpose">Mata Kuliah/Kegiatan</FieldLabel>
                   <input
                     id="purpose"
                     className={fieldClass}
                     type="text"
                     value={formState.purpose}
                     onChange={(event) => setFormState((prev) => ({ ...prev, purpose: event.target.value }))}
-                    placeholder="Contoh: Team Meeting, Training, Rapat Koordinasi (opsional)"
+                    placeholder="Contoh: Kalkulus I, Rapat Prodi, Seminar (opsional)"
                   />
                 </div>
               </div>
@@ -729,7 +733,7 @@ export default function BookingCalendar({
                     <header className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{booking.roomName || 'Room tanpa nama'}</p>
-                        <p className="text-sm text-slate-600">
+                        <p className="text-xl font-bold text-slate-900">
                           {booking.checkInTime} - {booking.checkOutTime}
                         </p>
                       </div>
