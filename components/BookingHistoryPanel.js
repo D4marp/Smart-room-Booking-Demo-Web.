@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Download, ExternalLink } from 'lucide-react';
+import { Download, ExternalLink, Pencil, X, Check } from 'lucide-react';
 import {
   buildFeedbackExportRows,
   EXPORT_COLUMN_ORDER,
   getRoomFacilitiesForBooking,
   getSelectedComplaintSet,
 } from '../lib/feedback';
+import { updateBooking } from '../lib/api';
 
 const fieldClass =
   'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-gold-400';
@@ -79,21 +80,64 @@ function applyWorksheetStyles(worksheet, headers, rowCount) {
 export default function BookingHistoryPanel({
   bookings,
   rooms = [],
-  title = 'Riwayat Booking',
-  subtitle = 'Filter riwayat booking berdasarkan status dan rentang tanggal, lalu export ke Excel.',
+  title = 'Kelola Jadwal',
+  subtitle = 'Filter jadwal booking berdasarkan status dan rentang tanggal, edit dosen/mata kuliah, atau export ke Excel.',
   showHeader = true,
   showFilters = true,
   showExport = true,
   previewLimit = null,
-  emptyMessage = 'Belum ada riwayat booking.',
+  emptyMessage = 'Belum ada jadwal booking.',
   onOpenPage,
-  filterTitle = 'Filter Riwayat Booking',
+  filterTitle = 'Filter Jadwal',
+  token = null,
+  onBookingUpdated,
 }) {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [feedback, setFeedback] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ pihak1: '', purpose: '', checkInTime: '', checkOutTime: '' });
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = (booking) => {
+    setEditingId(booking.id);
+    setEditForm({
+      pihak1: booking.pihak1 || '',
+      purpose: booking.purpose || '',
+      checkInTime: booking.checkInTime || '',
+      checkOutTime: booking.checkOutTime || '',
+    });
+    setFeedback('');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (bookingId) => {
+    if (!token) {
+      setFeedback('Sesi tidak valid, silakan muat ulang halaman.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateBooking(token, bookingId, {
+        pihak1: editForm.pihak1,
+        purpose: editForm.purpose,
+        checkInTime: editForm.checkInTime,
+        checkOutTime: editForm.checkOutTime,
+      });
+      setFeedback('Jadwal berhasil diperbarui.');
+      setEditingId(null);
+      if (onBookingUpdated) onBookingUpdated();
+    } catch (error) {
+      setFeedback(error.message || 'Gagal memperbarui jadwal');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredBookings = useMemo(() => {
     const source = Array.isArray(bookings) ? bookings : [];
@@ -272,9 +316,21 @@ export default function BookingHistoryPanel({
                     {formatBookingDate(booking.bookingDate)} • {booking.checkInTime} - {booking.checkOutTime}
                   </p>
                 </div>
-                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                  {booking.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                    {booking.status}
+                  </span>
+                  {token && editingId !== booking.id ? (
+                    <button
+                      type="button"
+                      className="rounded-lg border border-gold-200 bg-gold-50 p-1.5 text-gold-700 transition hover:bg-gold-100"
+                      onClick={() => startEdit(booking)}
+                      title="Edit dosen / mata kuliah / jam"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <p className="mt-2 text-xs text-slate-700">
                 {booking.picInput ? `${booking.picInput} • ` : ''}
@@ -286,7 +342,76 @@ export default function BookingHistoryPanel({
                   {booking.actualDurationMinutes != null ? ` • ${booking.actualDurationMinutes} menit` : ''}
                 </p>
               ) : null}
-              {booking.purpose ? <p className="mt-2 line-clamp-2 text-xs text-slate-600">{booking.purpose}</p> : null}
+
+              {editingId === booking.id ? (
+                <div className="mt-3 space-y-2 rounded-lg border border-gold-200 bg-white p-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <FieldLabel>Nama Dosen</FieldLabel>
+                      <input
+                        className={fieldClass}
+                        value={editForm.pihak1}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, pihak1: e.target.value }))}
+                        placeholder="Nama dosen pengajar"
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Mata Kuliah</FieldLabel>
+                      <input
+                        className={fieldClass}
+                        value={editForm.purpose}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, purpose: e.target.value }))}
+                        placeholder="Mata kuliah / kegiatan"
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Jam Mulai</FieldLabel>
+                      <input
+                        type="time"
+                        className={fieldClass}
+                        value={editForm.checkInTime}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, checkInTime: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Jam Selesai</FieldLabel>
+                      <input
+                        type="time"
+                        className={fieldClass}
+                        value={editForm.checkOutTime}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, checkOutTime: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      onClick={cancelEdit}
+                      disabled={saving}
+                    >
+                      <X size={12} />
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1 rounded-lg bg-gradient-to-r from-[#d9af49] to-[#a67f22] px-3 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                      onClick={() => saveEdit(booking.id)}
+                      disabled={saving}
+                    >
+                      <Check size={12} />
+                      {saving ? 'Menyimpan...' : 'Simpan'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {booking.pihak1 ? (
+                    <p className="mt-2 text-xs font-semibold text-slate-800">Dosen: {booking.pihak1}</p>
+                  ) : null}
+                  {booking.purpose ? <p className="mt-1 line-clamp-2 text-xs text-slate-600">{booking.purpose}</p> : null}
+                </>
+              )}
 
               {booking.feedback ? (
                 <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-white p-2">

@@ -601,7 +601,7 @@ function DashboardPageContent() {
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-semibold text-slate-900">Riwayat Booking Terbaru</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">Jadwal Terbaru</h2>
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                       {Math.min(bookings.length, 5)} preview
@@ -617,7 +617,9 @@ function DashboardPageContent() {
                     showFilters={false}
                     showExport={false}
                     previewLimit={5}
-                    emptyMessage="Belum ada riwayat booking untuk ditampilkan."
+                    emptyMessage="Belum ada jadwal booking untuk ditampilkan."
+                    token={token}
+                    onBookingUpdated={() => loadStatsAndBookings(token)}
                   />
                 </div>
               </div>

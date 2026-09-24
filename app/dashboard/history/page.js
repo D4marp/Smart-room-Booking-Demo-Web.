@@ -93,7 +93,7 @@ export default function BookingHistoryPage() {
   const handleRefresh = async () => {
     if (!token) return;
 
-    setInfo('Riwayat booking diperbarui.');
+    setInfo('Jadwal booking diperbarui.');
     await loadBookings(token);
   };
 
@@ -190,7 +190,7 @@ export default function BookingHistoryPage() {
           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-600">Smart Room Scheduler</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900">Halaman Riwayat Booking</h1>
+              <h1 className="mt-1 text-2xl font-bold text-slate-900">Kelola Jadwal Booking</h1>
               <p className="mt-1 text-sm text-slate-800">
                 Login sebagai <strong>{currentUser?.role}</strong> • {currentUser?.email}
               </p>
@@ -235,7 +235,9 @@ export default function BookingHistoryPage() {
             showFilters={true}
             showExport={true}
             previewLimit={null}
-            emptyMessage={loading ? 'Memuat riwayat booking...' : 'Belum ada riwayat booking.'}
+            emptyMessage={loading ? 'Memuat jadwal booking...' : 'Belum ada jadwal booking.'}
+            token={token}
+            onBookingUpdated={() => loadBookings(token)}
           />
         </section>
       </main>
