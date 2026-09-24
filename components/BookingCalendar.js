@@ -107,13 +107,9 @@ function bookingCellTone(items) {
 }
 
 function formatPihakLine(booking) {
-  const pihak1 = (booking.pihak1 || booking.paraPihak || '').trim();
-  const pihak2 = (booking.pihak2 || booking.divisi || '').trim();
-
-  if (!pihak1 && !pihak2) return null;
-  if (!pihak1) return `Pihak 2: ${pihak2}`;
-  if (!pihak2) return `Dosen Pengajar: ${pihak1}`;
-  return `Dosen Pengajar: ${pihak1} · Pihak 2: ${pihak2}`;
+  const dosen = (booking.pihak1 || booking.paraPihak || '').trim();
+  if (!dosen) return null;
+  return `Dosen: ${dosen}`;
 }
 
 function getBookingDateTime(booking, timeValue) {
@@ -628,33 +624,18 @@ export default function BookingCalendar({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <FieldLabel htmlFor="pihak-1">Dosen Pengajar</FieldLabel>
-                    <input
-                      id="pihak-1"
-                      className={fieldClass}
-                      type="text"
-                      value={formState.pihak1}
-                      onChange={(event) =>
-                        setFormState((prev) => ({ ...prev, pihak1: event.target.value }))
-                      }
-                      placeholder="Nama dosen pengajar (opsional)"
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel htmlFor="pihak-2">Pihak 2</FieldLabel>
-                    <input
-                      id="pihak-2"
-                      className={fieldClass}
-                      type="text"
-                      value={formState.pihak2}
-                      onChange={(event) =>
-                        setFormState((prev) => ({ ...prev, pihak2: event.target.value }))
-                      }
-                      placeholder="Pihak 2 (opsional)"
-                    />
-                  </div>
+                <div>
+                  <FieldLabel htmlFor="pihak-1">Nama Dosen</FieldLabel>
+                  <input
+                    id="pihak-1"
+                    className={fieldClass}
+                    type="text"
+                    value={formState.pihak1}
+                    onChange={(event) =>
+                      setFormState((prev) => ({ ...prev, pihak1: event.target.value }))
+                    }
+                    placeholder="Nama dosen pengajar (opsional)"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
