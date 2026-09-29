@@ -12,6 +12,7 @@ import BookingHistoryPanel from '@/components/BookingHistoryPanel';
 import BookingCalendar from '@/components/BookingCalendar';
 import RoomManagement from '@/components/RoomManagement';
 import FacilitiesManagement from '@/components/FacilitiesManagement';
+import FlyerManagement from '@/components/FlyerManagement';
 import SatisfactionWidget from '@/components/SatisfactionWidget';
 import StatCard from '@/components/StatCard';
 import UserManagement from '@/components/UserManagement';
@@ -653,6 +654,8 @@ function DashboardPageContent() {
             actionBusyKey={roomActionKey}
           />
         )}
+
+        {activeMenu === 'flyers' && <FlyerManagement token={token} rooms={rooms} />}
 
         {activeMenu === 'facilities' && (
           <FacilitiesManagement
