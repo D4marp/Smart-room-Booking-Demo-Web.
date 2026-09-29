@@ -1,11 +1,83 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Eye, EyeOff, ImagePlus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Eye, EyeOff, ImagePlus, Trash2 } from 'lucide-react';
 import { deleteFlyer, listManagedFlyers, updateFlyer, uploadFlyer } from '../lib/api';
 
 const fieldClass =
   'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-gold-400';
+
+// Official kiosk flyer slot: a 1:1 square. A flyer of exactly this size fills
+// the slot on the display with no cropping or empty bars.
+const OFFICIAL_SIZE = 1080;
+const MIN_SIZE = 720;
+const RATIO_TOLERANCE = 0.05;
+
+function analyzeDimensions(width, height) {
+  const shortSide = Math.min(width, height);
+  const ratioOk = Math.abs(width / height - 1) <= RATIO_TOLERANCE;
+
+  if (shortSide < MIN_SIZE) {
+    return {
+      level: 'block',
+      message: `Resolusi ${width}×${height} px terlalu kecil. Minimal ${MIN_SIZE}×${MIN_SIZE} px, ideal ${OFFICIAL_SIZE}×${OFFICIAL_SIZE} px.`,
+    };
+  }
+  if (!ratioOk) {
+    return {
+      level: 'warn',
+      message: `Ukuran ${width}×${height} px bukan persegi 1:1. Tepi gambar akan terpotong (crop dari tengah) agar memenuhi layar kiosk. Disarankan ${OFFICIAL_SIZE}×${OFFICIAL_SIZE} px.`,
+    };
+  }
+  if (shortSide < OFFICIAL_SIZE) {
+    return {
+      level: 'warn',
+      message: `Rasio sudah benar (${width}×${height} px), tetapi di bawah ukuran resmi ${OFFICIAL_SIZE}×${OFFICIAL_SIZE} px sehingga bisa terlihat kurang tajam.`,
+    };
+  }
+  return { level: 'ok', message: `Ukuran ${width}×${height} px sesuai standar kiosk.` };
+}
+
+function downloadTemplate() {
+  const canvas = document.createElement('canvas');
+  canvas.width = OFFICIAL_SIZE;
+  canvas.height = OFFICIAL_SIZE;
+  const ctx = canvas.getContext('2d');
+
+  const gradient = ctx.createLinearGradient(0, 0, OFFICIAL_SIZE, OFFICIAL_SIZE);
+  gradient.addColorStop(0, '#1e3a8a');
+  gradient.addColorStop(1, '#0a223f');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, OFFICIAL_SIZE, OFFICIAL_SIZE);
+
+  const margin = Math.round(OFFICIAL_SIZE * 0.05);
+  ctx.setLineDash([18, 14]);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#eab308';
+  ctx.strokeRect(margin, margin, OFFICIAL_SIZE - margin * 2, OFFICIAL_SIZE - margin * 2);
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 64px Arial, sans-serif';
+  ctx.fillText('TEMPLATE FLYER KIOSK', OFFICIAL_SIZE / 2, OFFICIAL_SIZE / 2 - 40);
+  ctx.font = 'bold 110px Arial, sans-serif';
+  ctx.fillStyle = '#eab308';
+  ctx.fillText(`${OFFICIAL_SIZE} × ${OFFICIAL_SIZE} px`, OFFICIAL_SIZE / 2, OFFICIAL_SIZE / 2 + 80);
+  ctx.font = '38px Arial, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('Rasio 1:1 (persegi)  •  Teks penting di dalam garis putus-putus', OFFICIAL_SIZE / 2, OFFICIAL_SIZE / 2 + 160);
+
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `template-flyer-kiosk-${OFFICIAL_SIZE}x${OFFICIAL_SIZE}.png`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
 
 function formatDate(ms) {
   if (!ms) return null;
@@ -31,6 +103,7 @@ export default function FlyerManagement({ token, rooms = [] }) {
   const [form, setForm] = useState({ title: '', roomId: '', durationSeconds: 8, startDate: '', endDate: '' });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
+  const [dimensions, setDimensions] = useState(null);
   const fileInputRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -59,13 +132,28 @@ export default function FlyerManagement({ token, rooms = [] }) {
   const handleFileChange = (event) => {
     const picked = event.target.files?.[0] || null;
     setFile(picked);
-    setPreview(picked ? URL.createObjectURL(picked) : '');
+    setDimensions(null);
+    if (!picked) {
+      setPreview('');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(picked);
+    setPreview(objectUrl);
+    const probe = new window.Image();
+    probe.onload = () => setDimensions(analyzeDimensions(probe.naturalWidth, probe.naturalHeight));
+    probe.onerror = () =>
+      setDimensions({ level: 'block', message: 'File tidak dapat dibaca sebagai gambar.' });
+    probe.src = objectUrl;
   };
 
   const handleUpload = async (event) => {
     event.preventDefault();
     if (!file) {
       setError('Pilih file flyer terlebih dahulu.');
+      return;
+    }
+    if (dimensions?.level === 'block') {
+      setError(dimensions.message);
       return;
     }
     setUploading(true);
@@ -84,6 +172,7 @@ export default function FlyerManagement({ token, rooms = [] }) {
       setInfo('Flyer berhasil diupload. Kiosk akan menampilkannya dalam ±1 menit.');
       setFile(null);
       setPreview('');
+      setDimensions(null);
       setForm((prev) => ({ ...prev, title: '', startDate: '', endDate: '' }));
       if (fileInputRef.current) fileInputRef.current.value = '';
       await load();
@@ -152,6 +241,32 @@ export default function FlyerManagement({ token, rooms = [] }) {
         </p>
       </header>
 
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-4 sm:flex-row sm:items-center">
+        <div className="grid aspect-square w-20 shrink-0 place-items-center rounded-lg border-2 border-dashed border-indigo-400 bg-white text-center text-[10px] font-bold leading-tight text-indigo-700">
+          1080
+          <br />×<br />
+          1080
+        </div>
+        <div className="flex-1 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">
+            Ukuran resmi flyer: {OFFICIAL_SIZE} × {OFFICIAL_SIZE} px (rasio 1:1, persegi)
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-slate-600">
+            <li>Flyer dengan ukuran ini tampil <strong>penuh</strong> di layar kiosk — tanpa terpotong dan tanpa bar kosong.</li>
+            <li>Format JPG / PNG / WEBP, maksimal 8 MB. Minimal {MIN_SIZE} × {MIN_SIZE} px.</li>
+            <li>Letakkan teks/logo penting di dalam area aman (sisakan ±5% dari tepi) agar tidak terpotong.</li>
+          </ul>
+        </div>
+        <button
+          type="button"
+          onClick={downloadTemplate}
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-indigo-300 bg-white px-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+        >
+          <Download size={16} />
+          Unduh Template
+        </button>
+      </div>
+
       {error ? (
         <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : null}
@@ -165,14 +280,14 @@ export default function FlyerManagement({ token, rooms = [] }) {
         <h3 className="text-sm font-semibold text-slate-900">Upload flyer baru</h3>
 
         <div className="grid gap-3 md:grid-cols-[220px_1fr]">
-          <label className="flex aspect-[4/3] cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-dashed border-gold-300 bg-white text-xs font-semibold text-gold-600 hover:bg-gold-100">
+          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border-2 border-dashed border-gold-300 bg-white text-xs font-semibold text-gold-600 hover:bg-gold-100">
             {preview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={preview} alt="pratinjau flyer" className="h-full w-full object-cover" />
             ) : (
               <>
                 <ImagePlus size={22} />
-                Pilih gambar (JPG/PNG/WEBP, maks 8MB)
+                Pilih gambar 1080×1080 px (JPG/PNG/WEBP, maks 8MB)
               </>
             )}
             <input
@@ -242,9 +357,25 @@ export default function FlyerManagement({ token, rooms = [] }) {
           </div>
         </div>
 
+        {dimensions ? (
+          <p
+            className={[
+              'rounded-lg border px-3 py-2 text-xs font-medium',
+              dimensions.level === 'ok'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : dimensions.level === 'warn'
+                  ? 'border-amber-200 bg-amber-50 text-amber-700'
+                  : 'border-red-200 bg-red-50 text-red-700',
+            ].join(' ')}
+          >
+            {dimensions.level === 'ok' ? '✓ ' : dimensions.level === 'warn' ? '⚠ ' : '✕ '}
+            {dimensions.message}
+          </p>
+        ) : null}
+
         <button
           type="submit"
-          disabled={uploading || !file}
+          disabled={uploading || !file || dimensions?.level === 'block'}
           className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#d9af49] to-[#a67f22] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <ImagePlus size={16} />
@@ -269,7 +400,7 @@ export default function FlyerManagement({ token, rooms = [] }) {
               ].join(' ')}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={flyer.imageUrl} alt={flyer.title || 'flyer'} className="aspect-[4/3] w-full object-cover" />
+              <img src={flyer.imageUrl} alt={flyer.title || 'flyer'} className="aspect-square w-full object-cover" />
               <div className="space-y-1 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-900">{flyer.title || 'Tanpa judul'}</p>
