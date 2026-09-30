@@ -318,17 +318,14 @@ export default function RoomManagement({
             </div>
 
             <div className="grid grid-cols-[130px_1fr] gap-3">
-              <label className="pt-2 text-xs font-semibold text-slate-700">Flyer / Poster Ruangan</label>
+              <label className="pt-2 text-xs font-semibold text-slate-700">Gambar Ruangan</label>
               <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <p className="mb-2 text-[11px] text-slate-500">
-                Flyer akan tampil bergantian (carousel) di layar kiosk ruangan. Upload lebih dari satu untuk rotasi otomatis.
-              </p>
 
               {roomImages.length > 0 ? (
                 <div className="mb-3 flex flex-wrap gap-2">
                   {roomImages.map((url) => (
                     <div key={url} className="relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200">
-                      <img src={url} alt="flyer ruangan" className="h-full w-full object-cover" />
+                      <img src={url} alt="room" className="h-full w-full object-cover" />
                       <button
                         type="button"
                         onClick={() => handleDeleteImage(url)}
@@ -340,12 +337,12 @@ export default function RoomManagement({
                   ))}
                 </div>
               ) : (
-                <p className="mb-2 text-xs text-slate-500">Belum ada flyer.</p>
+                <p className="mb-2 text-xs text-slate-500">Belum ada gambar.</p>
               )}
 
               <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-gold-300 bg-gold-50 px-3 py-1.5 text-xs font-semibold text-gold-600 hover:bg-gold-100">
                 <ImagePlus size={13} />
-                {imageUploading ? 'Mengupload...' : 'Upload Flyer'}
+                {imageUploading ? 'Mengupload...' : 'Tambah Gambar'}
                 <input
                   ref={fileInputRef}
                   type="file"
