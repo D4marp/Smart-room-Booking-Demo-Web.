@@ -65,20 +65,38 @@ export default function ScheduleImport({ token, rooms = [] }) {
     try {
       const XLSX = await import('xlsx');
       const workbook = XLSX.read(await file.arrayBuffer());
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-      const parsed = rows
-        .map((row) => ({
-          day: cell(row, 'hari'),
-          time: cell(row, 'jam'),
-          course: cell(row, 'matakuliah', 'mata kuliah'),
-          sks: Number(cell(row, 'sks')) || 0,
-          studyProgram: cell(row, 'program studi'),
-          class: cell(row, 'kelas'),
-          participants: Number(cell(row, 'peserta')) || 0,
-          lecturers: cell(row, 'dosen'),
-        }))
-        .filter((r) => r.day && r.time && r.course);
+      const toRows = (sheet) =>
+        XLSX.utils
+          .sheet_to_json(sheet, { defval: '' })
+          .map((row) => {
+            const start = cell(row, 'jam mulai');
+            const end = cell(row, 'jam selesai');
+            return {
+              day: cell(row, 'hari'),
+              time: cell(row, 'jam') || (start && end ? `${start} - ${end}` : ''),
+              course: cell(row, 'matakuliah', 'mata kuliah'),
+              sks: Number(cell(row, 'sks')) || 0,
+              studyProgram: cell(row, 'program studi'),
+              class: cell(row, 'kelas'),
+              participants: Number(cell(row, 'peserta')) || 0,
+              lecturers: cell(row, 'dosen'),
+            };
+          })
+          .filter((r) => r.day && r.time && r.course && r.class);
+      // Use the first sheet that has schedule rows; a per-date export repeats
+      // the same weekly slot many times, so collapse duplicates.
+      let parsed = [];
+      for (const name of workbook.SheetNames) {
+        parsed = toRows(workbook.Sheets[name]);
+        if (parsed.length) break;
+      }
+      const seen = new Set();
+      parsed = parsed.filter((r) => {
+        const key = [r.day, r.time, r.course, r.class].join('|').toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       if (!parsed.length) {
         throw new Error('Tidak ada baris jadwal. Kolom wajib: Hari, Jam, Matakuliah, Kelas, Dosen.');
       }
