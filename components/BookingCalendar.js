@@ -5,8 +5,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getRoomFacilitiesForBooking, getSelectedComplaintSet } from '../lib/feedback';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
-const MINUTES = ['00', '15', '30', '45'];
 
 function toDateKey(value) {
   const date = new Date(Number(value));
@@ -143,16 +141,11 @@ function formatCompleteAvailableAt(booking) {
   });
 }
 
-function splitTimeValue(value) {
-  const [hour = '08', minute = '00'] = String(value || '08:00').split(':');
-  return {
-    hour: HOURS.includes(hour) ? hour : '08',
-    minute: MINUTES.includes(minute) ? minute : '00',
-  };
-}
-
-function joinTimeValue(hour, minute) {
-  return `${hour}:${minute}`;
+function isValidTime(hour, minute) {
+  if (hour === '' || minute === '' || hour === undefined || minute === undefined) return false;
+  const h = Number(hour);
+  const m = Number(minute);
+  return Number.isInteger(h) && Number.isInteger(m) && h >= 0 && h <= 23 && m >= 0 && m <= 59;
 }
 
 const fieldClass =
@@ -170,43 +163,77 @@ function FieldLabel({ htmlFor, required, children }) {
 const timeFieldClass =
   'h-14 w-full rounded-xl border border-slate-200 bg-white px-3 text-2xl font-bold text-slate-900 outline-none transition focus:border-gold-400';
 
+// Free-typed time (24h): the user types the hour and the minute themselves,
+// any value 0-23 / 0-59 (no 15-minute steps). The parent receives "HH:MM", or ""
+// while either field is empty/invalid so the form cannot be submitted.
 function TimeSelect24({ id, label, required, value, onChange }) {
-  const { hour, minute } = splitTimeValue(value);
+  const [initialHour = '', initialMinute = ''] = String(value || '').split(':');
+  const [hour, setHour] = useState(initialHour);
+  const [minute, setMinute] = useState(initialMinute);
 
+  // follow outside changes (e.g. the form is reset after saving)
+  useEffect(() => {
+    const [h = '', m = ''] = String(value || '').split(':');
+    if (value && (h !== hour.padStart(2, '0') || m !== minute.padStart(2, '0'))) {
+      setHour(h);
+      setMinute(m);
+    }
+    if (!value && (hour || minute) && isValidTime(hour, minute)) {
+      // parent cleared a previously valid value
+      setHour('');
+      setMinute('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const push = (h, m) => onChange(isValidTime(h, m) ? `${h.padStart(2, '0')}:${m.padStart(2, '0')}` : '');
+  const digits = (raw) => raw.replace(/\D/g, '').slice(0, 2);
+
+  const inputClass = `${timeFieldClass} text-center`;
   return (
     <div>
       <label htmlFor={`${id}-hour`} className="mb-1 block text-sm font-semibold text-slate-800">
         {label}
         {required ? <span className="text-red-600"> *</span> : null}
       </label>
-      <div className="grid grid-cols-2 gap-2">
-        <select
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <input
           id={`${id}-hour`}
-          className={timeFieldClass}
+          className={inputClass}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="JJ"
+          aria-label={`${label} - jam (0-23)`}
           value={hour}
-          onChange={(event) => onChange(joinTimeValue(event.target.value, minute))}
+          onChange={(event) => {
+            const next = digits(event.target.value);
+            setHour(next);
+            push(next, minute);
+          }}
+          onBlur={() => hour && setHour(hour.padStart(2, '0'))}
           required={required}
-        >
-          {HOURS.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select
+        />
+        <span className="text-2xl font-bold text-slate-500">:</span>
+        <input
           id={`${id}-minute`}
-          className={timeFieldClass}
+          className={inputClass}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="MM"
+          aria-label={`${label} - menit (0-59)`}
           value={minute}
-          onChange={(event) => onChange(joinTimeValue(hour, event.target.value))}
+          onChange={(event) => {
+            const next = digits(event.target.value);
+            setMinute(next);
+            push(hour, next);
+          }}
+          onBlur={() => minute && setMinute(minute.padStart(2, '0'))}
           required={required}
-        >
-          {MINUTES.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+        />
       </div>
+      {(hour || minute) && !isValidTime(hour, minute) ? (
+        <p className="mt-1 text-xs text-red-600">Jam 00-23 dan menit 00-59.</p>
+      ) : null}
     </div>
   );
 }
