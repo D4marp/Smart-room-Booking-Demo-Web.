@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { importSchedule, listClasses } from '../lib/api';
+import { buildScheduleTemplate, NON_DATA_SHEET, TEMPLATE_FILE_NAME } from '../lib/scheduleTemplate';
 
 const fieldClass =
   'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-gold-400';
@@ -86,7 +87,8 @@ export default function ScheduleImport({ token, rooms = [] }) {
       // Use the first sheet that has schedule rows; a per-date export repeats
       // the same weekly slot many times, so collapse duplicates.
       let parsed = [];
-      for (const name of workbook.SheetNames) {
+      const dataSheets = workbook.SheetNames.filter((name) => !NON_DATA_SHEET.test(name));
+      for (const name of dataSheets.length ? dataSheets : workbook.SheetNames) {
         parsed = toRows(workbook.Sheets[name]);
         if (parsed.length) break;
       }
@@ -106,6 +108,15 @@ export default function ScheduleImport({ token, rooms = [] }) {
       setItems([]);
       setFileName('');
       setError(err.message || 'Gagal membaca file Excel');
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx-js-style');
+      XLSX.writeFile(buildScheduleTemplate(XLSX), TEMPLATE_FILE_NAME);
+    } catch (err) {
+      setError(err.message || 'Gagal membuat template Excel');
     }
   };
 
@@ -138,6 +149,21 @@ export default function ScheduleImport({ token, rooms = [] }) {
           Upload jadwal ruangan (Excel). Setiap baris diulang tiap minggu pada rentang tanggal,
           lalu langsung tampil di tab ruangan beserta kelas dan dosennya.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-gold-200 bg-gold-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-slate-700">
+          Belum punya file jadwal? Unduh template Excel (berisi kolom yang benar, contoh isian, dan petunjuk), isi sheet{' '}
+          <b>Jadwal</b>, lalu unggah di bawah.
+        </p>
+        <button
+          type="button"
+          onClick={handleDownloadTemplate}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gold-300 bg-white px-4 py-2 text-sm font-semibold text-gold-700 transition hover:bg-gold-100"
+        >
+          <Download className="h-4 w-4" />
+          Unduh Template Excel
+        </button>
       </div>
 
       <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 md:grid-cols-3">
