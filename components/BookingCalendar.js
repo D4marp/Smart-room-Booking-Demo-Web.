@@ -339,7 +339,9 @@ export default function BookingCalendar({
 
   const groupedBookings = useMemo(() => {
     const map = {};
-    bookings.forEach((booking) => {
+    // The status filter only affects this calendar (it must not change what other pages load).
+    const visible = statusFilter ? bookings.filter((booking) => booking.status === statusFilter) : bookings;
+    visible.forEach((booking) => {
       const key = toDateKey(booking.bookingDate);
       if (!key) return;
       if (!map[key]) map[key] = [];
@@ -351,7 +353,7 @@ export default function BookingCalendar({
     });
 
     return map;
-  }, [bookings]);
+  }, [bookings, statusFilter]);
 
   const rows = useMemo(() => buildRows(viewMonth), [viewMonth]);
   const weekCells = useMemo(() => buildWeekCells(viewWeekStart), [viewWeekStart]);
@@ -864,6 +866,7 @@ export default function BookingCalendar({
                             const disabledReason = `Complete aktif setelah ${formatCompleteAvailableAt(booking)}`;
 
                             return (
+                              <>
                               <div className="flex flex-col gap-1">
                                 <button
                                   type="button"
@@ -878,6 +881,18 @@ export default function BookingCalendar({
                                   <span className="text-[11px] font-medium text-slate-500">{disabledReason}</span>
                                 ) : null}
                               </div>
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                  onClick={() => onBookingAction('cancel', booking)}
+                                  disabled={actionLoadingKey === `cancel:${booking.id}`}
+                                  title="Batalkan booking ini"
+                                >
+                                  {actionLoadingKey === `cancel:${booking.id}` ? 'Membatalkan...' : 'Cancel'}
+                                </button>
+                              </div>
+                              </>
                             );
                           })()}
 

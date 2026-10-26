@@ -3,11 +3,10 @@
 import { useMemo, useState } from 'react';
 import { Download, ExternalLink, Pencil, X, Check } from 'lucide-react';
 import {
-  buildFeedbackExportRows,
-  EXPORT_COLUMN_ORDER,
   getRoomFacilitiesForBooking,
   getSelectedComplaintSet,
 } from '../lib/feedback';
+import { buildScheduleWorkbook, exportFileName, splitCourseAndClass } from '../lib/bookingExport';
 import { updateBooking } from '../lib/api';
 
 const fieldClass =
@@ -31,50 +30,11 @@ function formatBookingDate(value) {
   });
 }
 
-function columnAddress(columnIndex, rowIndex) {
-  let column = '';
-  let temp = columnIndex + 1;
-
-  while (temp > 0) {
-    const mod = (temp - 1) % 26;
-    column = String.fromCharCode(65 + mod) + column;
-    temp = Math.floor((temp - mod) / 26);
-  }
-
-  return `${column}${rowIndex}`;
-}
-
-function applyWorksheetStyles(worksheet, headers, rowCount) {
-  headers.forEach((_, columnIndex) => {
-    const cellAddress = columnAddress(columnIndex, 1);
-    if (!worksheet[cellAddress]) return;
-    worksheet[cellAddress].s = {
-      font: { bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '0077CC' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } },
-      },
-    };
-  });
-
-  for (let rowIndex = 2; rowIndex <= rowCount + 1; rowIndex += 1) {
-    headers.forEach((_, columnIndex) => {
-      const cellAddress = columnAddress(columnIndex, rowIndex);
-      if (!worksheet[cellAddress]) return;
-      worksheet[cellAddress].s = {
-        border: {
-          top: { style: 'thin', color: { rgb: 'CCCCCC' } },
-          bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
-          left: { style: 'thin', color: { rgb: 'CCCCCC' } },
-          right: { style: 'thin', color: { rgb: 'CCCCCC' } },
-        },
-      };
-    });
-  }
+// Start/end of a booking as epoch ms. bookingDate is the WIB midnight of the day.
+function bookingTimeMs(booking, hhmm) {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return Number(booking.bookingDate || 0) + (h * 60 + m) * 60 * 1000;
 }
 
 export default function BookingHistoryPanel({
@@ -86,6 +46,7 @@ export default function BookingHistoryPanel({
   showFilters = true,
   showExport = true,
   previewLimit = null,
+  upcomingOnly = false,
   emptyMessage = 'Belum ada jadwal booking.',
   onOpenPage,
   filterTitle = 'Filter Jadwal',
@@ -157,8 +118,24 @@ export default function BookingHistoryPanel({
       filtered = filtered.filter((booking) => Number(booking.bookingDate || 0) <= toTime);
     }
 
+    if (upcomingOnly) {
+      // "Hari ini & mendatang": active bookings that have not finished yet, soonest first.
+      const now = Date.now();
+      return filtered
+        .filter((booking) => {
+          if (booking.status !== 'confirmed' && booking.status !== 'pending') return false;
+          const end = bookingTimeMs(booking, booking.checkOutTime);
+          return end == null || end >= now;
+        })
+        .sort(
+          (left, right) =>
+            (bookingTimeMs(left, left.checkInTime) ?? Number(left.bookingDate || 0)) -
+            (bookingTimeMs(right, right.checkInTime) ?? Number(right.bookingDate || 0)),
+        );
+    }
+
     return filtered.sort((left, right) => Number(right.bookingDate || 0) - Number(left.bookingDate || 0));
-  }, [bookings, statusFilter, dateFrom, dateTo]);
+  }, [bookings, statusFilter, dateFrom, dateTo, upcomingOnly]);
 
   const visibleBookings = useMemo(() => {
     if (typeof previewLimit === 'number') {
@@ -168,35 +145,14 @@ export default function BookingHistoryPanel({
     return filteredBookings;
   }, [filteredBookings, previewLimit]);
 
-  const exportModel = useMemo(
-    () => buildFeedbackExportRows(filteredBookings, rooms),
-    [filteredBookings, rooms],
-  );
-
   const handleExport = async () => {
     try {
       setExporting(true);
       setFeedback('');
 
       const XLSX = await import('xlsx-js-style');
-      const headers = [...EXPORT_COLUMN_ORDER, ...exportModel.facilityColumns];
-      const exportData = exportModel.rows.map((row) => {
-        const ordered = {};
-        headers.forEach((key) => {
-          ordered[key] = row[key] ?? '-';
-        });
-        return ordered;
-      });
-
-      const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
-      applyWorksheetStyles(worksheet, headers, exportData.length);
-      worksheet['!cols'] = headers.map((header) => ({ wch: Math.max(String(header).length + 2, 14) }));
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Booking History');
-
-      const timestamp = new Date().toISOString().slice(0, 10);
-      XLSX.writeFile(workbook, `booking-history-${timestamp}.xlsx`);
+      const workbook = buildScheduleWorkbook(XLSX, filteredBookings, rooms);
+      XLSX.writeFile(workbook, exportFileName());
       setFeedback('Data berhasil diexport ke Excel.');
     } catch (error) {
       setFeedback(error.message || 'Gagal export data ke Excel');
@@ -332,7 +288,23 @@ export default function BookingHistoryPanel({
                   ) : null}
                 </div>
               </div>
-              <p className="mt-2 text-xs text-slate-700">
+              {(() => {
+                const { course, kelas } = splitCourseAndClass(booking);
+                return (
+                  <>
+                    {course !== '-' ? (
+                      <p className="mt-2 text-xs font-semibold text-slate-900">
+                        {course}
+                        {kelas !== '-' ? ` • Kelas ${kelas}` : ''}
+                      </p>
+                    ) : null}
+                    {booking.pihak1 ? (
+                      <p className="text-xs text-slate-600">Dosen: {String(booking.pihak1).split(';').map((n) => n.trim()).filter(Boolean).join(', ')}</p>
+                    ) : null}
+                  </>
+                );
+              })()}
+              <p className="mt-1 text-xs text-slate-700">
                 {booking.picInput ? `${booking.picInput} • ` : ''}
                 {booking.userName || 'Unknown User'} • Guests: {booking.numberOfGuests}
               </p>
